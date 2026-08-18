@@ -1,8 +1,9 @@
 # papercast-archiver
 
-A tiny web companion to [papercast](https://github.com/cdzombak/papercast). papercast puts links in each episode's description pointing at this app; opening one shows the article's title and source and offers two actions — **Archive** and **Delete** — which act on the Instapaper article underlying the episode, after a confirmation step.
+A tiny web companion to [papercast](https://github.com/cdzombak/papercast). papercast can put links in each episode's description pointing at this app; opening one shows the article's metadata and offers two actions, **Archive** and **Delete**, which act on the Instapaper article underlying the episode.
 
-There is no authentication: the app is designed to run behind Tailscale or a similar secure, single-user reverse proxy. Do not expose it to the public internet.
+> [!WARNING]
+> There is no authentication; the app is designed to run behind Tailscale or a similar secure, single-user reverse proxy. Do not expose it to the public internet.
 
 ## Configuration
 
