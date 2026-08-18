@@ -1,0 +1,6 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "article" .}}
+<p style="margin-top: 1rem;">The {{.Action}} operation failed.</p>
+<div class="error-details">{{.ErrorText}}</div>
+{{end}}

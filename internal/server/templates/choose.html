@@ -1,0 +1,8 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "article" .}}
+<div class="actions">
+  <a class="btn" href="{{.ActionURL}}">Archive</a>
+  <a class="btn btn-danger" href="{{.AltAction}}">Delete</a>
+</div>
+{{end}}

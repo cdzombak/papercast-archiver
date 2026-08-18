@@ -1,0 +1,11 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "article" .}}
+<div class="actions">
+  <form method="post" action="{{.ActionURL}}">
+    <input type="hidden" name="title" value="{{.Title}}">
+    <input type="hidden" name="domain" value="{{.Domain}}">
+    <button class="btn btn-danger" type="submit">{{.ButtonText}}</button>
+  </form>
+</div>
+{{end}}

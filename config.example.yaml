@@ -1,0 +1,14 @@
+server:
+  # Address/port the server listens on.
+  listen: "0.0.0.0:8080"
+  # Complete base URL at which papercast-archiver is exposed to users.
+  base_url: "https://server.my-tailnet.ts.net:8443"
+
+instapaper:
+  # OAuth consumer key/secret; request one at
+  # https://www.instapaper.com/main/request_oauth_consumer_token
+  consumer_key: "your-instapaper-oauth-consumer-key"
+  consumer_secret: "your-instapaper-oauth-consumer-secret"
+  # Path where the Instapaper OAuth token is stored; created by
+  # "papercast-archiver instapaper-login".
+  credentials_file: "/instapaper.json"
