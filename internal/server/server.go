@@ -83,6 +83,7 @@ type pageData struct {
 	Action     string // "archive" or "delete"
 	ActionURL  string // confirm-page link or POST target
 	AltAction  string // the other action's confirm-page link (choose page)
+	CancelURL  string // back to the decision page (confirm page)
 	ErrorText  string // error page only
 	HeadTitle  string // <title> content
 	Heading    string
@@ -144,6 +145,7 @@ func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
 		ID:         id,
 		Action:     action,
 		ActionURL:  "/" + id + "/" + action,
+		CancelURL:  "/" + id + paramQuery(title, domain),
 		HeadTitle:  "Confirm " + action,
 		Heading:    label + " this article?",
 		ButtonText: label,

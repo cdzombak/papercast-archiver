@@ -150,6 +150,7 @@ func TestConfirmPage(t *testing.T) {
 		`name="domain" value="d.com"`,
 		">Delete</button>",
 		"Delete this article?",
+		`class="cancel" href="/42?domain=d.com&amp;title=T"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body missing %q", want)
