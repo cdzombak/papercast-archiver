@@ -43,13 +43,19 @@ services:
 
 ### 1. Log in to Instapaper
 
-Before the first run, generate the Instapaper credentials file. This is the only time the credentials file mount needs to be writable (`instapaper.json` must exist first, e.g. `touch instapaper.json`):
+Before the first run, generate the Instapaper credentials file. This is the only time the credentials file needs to be mounted writable, so run it with `docker run` rather than `docker compose run`, whose read-only mount of `instapaper.json` can't be overridden from the command line. The file must exist first, or Docker will create a directory in its place:
 
 ```shell
-docker compose run --rm -it -v ./instapaper.json:/instapaper.json papercast-archiver instapaper-login -config /config.yaml
+touch instapaper.json
+docker run --rm -it \
+  -v "$(pwd)/config.yaml:/config.yaml:ro" \
+  -v "$(pwd)/instapaper.json:/instapaper.json" \
+  cdzombak/papercast-archiver:1 instapaper-login -config /config.yaml
 ```
 
 You'll be prompted for your Instapaper username and password; they're exchanged for a permanent OAuth token saved to `instapaper.json`, and are not stored.
+
+The container runs as UID 1000, so on Linux `instapaper.json` must be writable by that UID for this step; `chown 1000:1000 instapaper.json` if your account uses a different one.
 
 ### 2. Start the server
 
