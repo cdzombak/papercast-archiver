@@ -27,7 +27,7 @@ instapaper:
 
 ## Deployment
 
-Docker images for amd64 and arm64 are published to Docker Hub as [`cdzombak/papercast-archiver`](https://hub.docker.com/r/cdzombak/papercast-archiver). See [`docker-compose.example.yml`](docker-compose.example.yml):
+Docker images for amd64 and arm64 are published to Docker Hub as [`cdzombak/papercast-archiver`](https://hub.docker.com/r/cdzombak/papercast-archiver) and to GHCR as [`ghcr.io/cdzombak/papercast-archiver`](https://github.com/cdzombak/papercast-archiver/pkgs/container/papercast-archiver); the two are identical. See [`docker-compose.example.yml`](docker-compose.example.yml):
 
 ```yaml
 services:
