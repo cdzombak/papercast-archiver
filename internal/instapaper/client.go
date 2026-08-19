@@ -16,8 +16,8 @@ import (
 
 const defaultBaseURL = "https://www.instapaper.com/api/1"
 
-// maxErrBodyLen limits how much of an error response body is included in errors.
-const maxErrBodyLen = 512
+// maxErrBodyRunes limits how much of an error response body is included in errors.
+const maxErrBodyRunes = 512
 
 // API is the subset of the Instapaper API the web server depends on.
 type API interface {
@@ -173,10 +173,13 @@ func checkAPIError(body []byte) error {
 	return nil
 }
 
+// truncate renders a response body for inclusion in an error message,
+// limiting it by runes so a cut never splits a multi-byte character.
 func truncate(b []byte) string {
 	s := strings.TrimSpace(string(b))
-	if len(s) > maxErrBodyLen {
-		s = s[:maxErrBodyLen] + "..."
+	runes := []rune(s)
+	if len(runes) <= maxErrBodyRunes {
+		return s
 	}
-	return s
+	return string(runes[:maxErrBodyRunes]) + "..."
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func testClient(t *testing.T, handler http.HandlerFunc) *Client {
@@ -140,5 +141,20 @@ func TestActionWithoutToken(t *testing.T) {
 	c := NewClient("ckey", "csecret", nil)
 	if err := c.Archive(context.Background(), 1); err == nil {
 		t.Fatal("want error when unauthenticated")
+	}
+}
+
+func TestTruncate(t *testing.T) {
+	if got := truncate([]byte("  short  ")); got != "short" {
+		t.Errorf("truncate(short) = %q", got)
+	}
+
+	long := strings.Repeat("ü", maxErrBodyRunes+10)
+	got := truncate([]byte(long))
+	if want := strings.Repeat("ü", maxErrBodyRunes) + "..."; got != want {
+		t.Errorf("truncate(long) = %q, want %q", got, want)
+	}
+	if !utf8.ValidString(got) {
+		t.Error("truncate split a multi-byte rune")
 	}
 }
