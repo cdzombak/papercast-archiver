@@ -201,7 +201,7 @@ Run the web server on the address configured at server.listen.`)
 		return exitFailure
 	}
 	api := instapaper.NewClient(cfg.Instapaper.ConsumerKey, cfg.Instapaper.ConsumerSecret, creds)
-	srv := server.New(api, cfg.Server.BaseURL, logger)
+	srv := server.New(api, cfg.Server.PathPrefix(), logger)
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Listen,

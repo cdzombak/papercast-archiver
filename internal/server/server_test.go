@@ -28,11 +28,13 @@ func (m *mockAPI) Delete(_ context.Context, id int64) error {
 	return m.err
 }
 
-const testBaseURL = "https://archiver.example.com"
-
 func testServer(api *mockAPI) http.Handler {
+	return testServerPrefix(api, "")
+}
+
+func testServerPrefix(api *mockAPI, prefix string) http.Handler {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return New(api, testBaseURL, logger).Handler()
+	return New(api, prefix, logger).Handler()
 }
 
 func get(t *testing.T, h http.Handler, target string) *httptest.ResponseRecorder {
@@ -172,7 +174,7 @@ func TestPostArchive(t *testing.T) {
 		t.Errorf("deleted = %v", api.deleted)
 	}
 	loc := rec.Header().Get("Location")
-	want := testBaseURL + "/12345/archive/done?domain=example.com&title=My+Title"
+	want := "/12345/archive/done?domain=example.com&title=My+Title"
 	if loc != want {
 		t.Errorf("Location = %q, want %q", loc, want)
 	}
@@ -187,7 +189,7 @@ func TestPostDelete(t *testing.T) {
 	if len(api.deleted) != 1 || api.deleted[0] != 7 {
 		t.Errorf("deleted = %v", api.deleted)
 	}
-	if loc := rec.Header().Get("Location"); loc != testBaseURL+"/7/delete/done" {
+	if loc := rec.Header().Get("Location"); loc != "/7/delete/done" {
 		t.Errorf("Location = %q", loc)
 	}
 }
@@ -233,6 +235,95 @@ func TestDonePage(t *testing.T) {
 	rec = get(t, testServer(&mockAPI{}), "/12345/archive/done")
 	if !strings.Contains(rec.Body.String(), "Archived") {
 		t.Error("archive done page missing heading")
+	}
+}
+
+func TestPathPrefixChoosePage(t *testing.T) {
+	h := testServerPrefix(&mockAPI{}, "/secret")
+	// Links carry the prefix whether or not the request path does, so the
+	// app works behind both stripping and non-stripping proxies.
+	for _, target := range []string{"/secret/12345?title=T", "/12345?title=T"} {
+		rec := get(t, h, target)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s: status = %d", target, rec.Code)
+		}
+		body := rec.Body.String()
+		for _, want := range []string{
+			`href="/secret/12345/archive?title=T"`,
+			`href="/secret/12345/delete?title=T"`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("GET %s: body missing %q", target, want)
+			}
+		}
+	}
+}
+
+func TestPathPrefixConfirmPage(t *testing.T) {
+	rec := get(t, testServerPrefix(&mockAPI{}, "/secret"), "/secret/42/delete?title=T")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`action="/secret/42/delete"`,
+		`class="cancel" href="/secret/42?title=T"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q", want)
+		}
+	}
+}
+
+func TestPathPrefixPostRedirect(t *testing.T) {
+	api := &mockAPI{}
+	rec := postForm(t, testServerPrefix(api, "/secret"), "/secret/7/archive", url.Values{})
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", rec.Code)
+	}
+	if len(api.archived) != 1 || api.archived[0] != 7 {
+		t.Errorf("archived = %v", api.archived)
+	}
+	if loc := rec.Header().Get("Location"); loc != "/secret/7/archive/done" {
+		t.Errorf("Location = %q", loc)
+	}
+}
+
+func TestPathPrefixStatus(t *testing.T) {
+	h := testServerPrefix(&mockAPI{}, "/secret")
+	for _, target := range []string{"/_status", "/secret/_status"} {
+		if rec := get(t, h, target); rec.Code != http.StatusOK {
+			t.Errorf("GET %s: status = %d", target, rec.Code)
+		}
+	}
+}
+
+func TestPathPrefixBoundary(t *testing.T) {
+	// "/secrets/..." must not be treated as prefixed; it falls through to
+	// the mux, where "secrets" is a non-numeric id.
+	rec := get(t, testServerPrefix(&mockAPI{}, "/secret"), "/secrets/1")
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestCutPathPrefix(t *testing.T) {
+	tests := []struct {
+		path, prefix, want string
+		ok                 bool
+	}{
+		{"/secret/1", "/secret", "/1", true},
+		{"/secret", "/secret", "/", true},
+		{"/secrets/1", "/secret", "/secrets/1", false},
+		{"/1", "/secret", "/1", false},
+		{"/a/b/1", "/a/b", "/1", true},
+	}
+	for _, tt := range tests {
+		got, ok := cutPathPrefix(tt.path, tt.prefix)
+		if got != tt.want || ok != tt.ok {
+			t.Errorf("cutPathPrefix(%q, %q) = %q, %v; want %q, %v",
+				tt.path, tt.prefix, got, ok, tt.want, tt.ok)
+		}
 	}
 }
 

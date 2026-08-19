@@ -2,6 +2,7 @@ server:
   # Address/port the server listens on.
   listen: "0.0.0.0:8080"
   # Complete base URL at which papercast-archiver is exposed to users.
+  # May include a path prefix, e.g. "https://server.example.com/archiver".
   base_url: "https://server.my-tailnet.ts.net:8443"
 
 instapaper:

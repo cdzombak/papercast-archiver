@@ -56,6 +56,39 @@ func TestLoadTrimsTrailingSlash(t *testing.T) {
 	}
 }
 
+func TestPathPrefix(t *testing.T) {
+	tests := []struct {
+		baseURL string
+		want    string
+	}{
+		{"https://example.com", ""},
+		{"https://example.com:8443", ""},
+		{"https://example.com/secret", "/secret"},
+		{"https://example.com/a/b", "/a/b"},
+	}
+	for _, tt := range tests {
+		cfg, err := Load(writeConfig(t, strings.Replace(validConfig,
+			"https://server.my-tailnet.ts.net:1234", tt.baseURL, 1)))
+		if err != nil {
+			t.Fatalf("Load(base_url=%q): %v", tt.baseURL, err)
+		}
+		if got := cfg.Server.PathPrefix(); got != tt.want {
+			t.Errorf("PathPrefix() for %q = %q, want %q", tt.baseURL, got, tt.want)
+		}
+	}
+}
+
+func TestPathPrefixTrimsTrailingSlash(t *testing.T) {
+	cfg, err := Load(writeConfig(t, strings.Replace(validConfig,
+		"https://server.my-tailnet.ts.net:1234", "https://example.com/secret/", 1)))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := cfg.Server.PathPrefix(); got != "/secret" {
+		t.Errorf("PathPrefix() = %q, want %q", got, "/secret")
+	}
+}
+
 func TestLoadMissingFile(t *testing.T) {
 	if _, err := Load(filepath.Join(t.TempDir(), "nope.yaml")); err == nil {
 		t.Fatal("want error for missing file")
@@ -83,6 +116,12 @@ func TestLoadValidationErrors(t *testing.T) {
 		{"relative base_url", func(s string) string {
 			return strings.Replace(s, "https://server.my-tailnet.ts.net:1234", "server.example.com", 1)
 		}, "server.base_url must be an absolute http(s) URL"},
+		{"base_url with query", func(s string) string {
+			return strings.Replace(s, "https://server.my-tailnet.ts.net:1234", "https://example.com/x?y=1", 1)
+		}, "server.base_url must not contain a query or fragment"},
+		{"base_url with fragment", func(s string) string {
+			return strings.Replace(s, "https://server.my-tailnet.ts.net:1234", "https://example.com/x#y", 1)
+		}, "server.base_url must not contain a query or fragment"},
 		{"missing consumer_key", func(s string) string {
 			return strings.Replace(s, `consumer_key: "key"`, `consumer_key: ""`, 1)
 		}, "instapaper.consumer_key is required"},

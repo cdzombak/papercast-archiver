@@ -46,6 +46,17 @@ func Load(path string) (*Config, error) {
 	return &cfg, nil
 }
 
+// PathPrefix returns the path component of BaseURL with no trailing slash,
+// or "" when the app is served at the root. All links and redirects the
+// server generates are placed under this prefix.
+func (s ServerConfig) PathPrefix() string {
+	u, err := url.Parse(s.BaseURL)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimRight(u.EscapedPath(), "/")
+}
+
 func (c *Config) validate() error {
 	var errs []string
 	req := func(v, name string) {
@@ -62,8 +73,11 @@ func (c *Config) validate() error {
 
 	if c.Server.BaseURL != "" {
 		u, err := url.Parse(c.Server.BaseURL)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		switch {
+		case err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "":
 			errs = append(errs, "server.base_url must be an absolute http(s) URL")
+		case u.RawQuery != "" || u.Fragment != "":
+			errs = append(errs, "server.base_url must not contain a query or fragment")
 		}
 	}
 

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cdzombak/papercast-archiver/internal/instapaper"
@@ -24,19 +25,20 @@ var pageNames = []string{"choose.html", "confirm.html", "done.html", "error.html
 
 // Server handles HTTP requests. Construct with New.
 type Server struct {
-	api     instapaper.API
-	baseURL string // no trailing slash
-	log     *slog.Logger
-	pages   map[string]*template.Template
+	api    instapaper.API
+	prefix string // base URL path prefix: "" or "/like/this"
+	log    *slog.Logger
+	pages  map[string]*template.Template
 }
 
-// New creates a Server. baseURL must not end with a trailing slash.
-func New(api instapaper.API, baseURL string, log *slog.Logger) *Server {
+// New creates a Server. pathPrefix is the base URL's path component; it must
+// be "" or start with "/" and not end with one (see config.ServerConfig.PathPrefix).
+func New(api instapaper.API, pathPrefix string, log *slog.Logger) *Server {
 	pages := make(map[string]*template.Template, len(pageNames))
 	for _, name := range pageNames {
 		pages[name] = template.Must(template.ParseFS(templateFS, "templates/base.html", "templates/"+name))
 	}
-	return &Server{api: api, baseURL: baseURL, log: log, pages: pages}
+	return &Server{api: api, prefix: pathPrefix, log: log, pages: pages}
 }
 
 // Handler returns the root HTTP handler, with request logging attached.
@@ -47,7 +49,47 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /{id}/{action}", s.handleConfirm)
 	mux.HandleFunc("POST /{id}/{action}", s.handleAction)
 	mux.HandleFunc("GET /{id}/{action}/done", s.handleDone)
-	return s.logRequests(mux)
+	var h http.Handler = mux
+	if s.prefix != "" {
+		h = stripPrefix(s.prefix, mux)
+	}
+	return s.logRequests(h)
+}
+
+// stripPrefix serves requests whose path begins with prefix by removing it,
+// and passes all other requests through unchanged. This makes the app work
+// whether or not a reverse proxy strips the prefix, and when it is reached
+// directly at host:port.
+func stripPrefix(prefix string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p, ok := cutPathPrefix(r.URL.Path, prefix)
+		rp, rok := cutPathPrefix(r.URL.RawPath, prefix)
+		if !ok || (r.URL.RawPath != "" && !rok) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		r2.URL.Path = p
+		r2.URL.RawPath = rp
+		next.ServeHTTP(w, r2)
+	})
+}
+
+// cutPathPrefix removes prefix from path at a "/" boundary, so that
+// prefix "/secret" matches "/secret" and "/secret/1" but not "/secrets".
+// It reports ok=false, returning path unchanged, when there is no match.
+func cutPathPrefix(path, prefix string) (string, bool) {
+	rest, ok := strings.CutPrefix(path, prefix)
+	if !ok || (rest != "" && rest[0] != '/') {
+		return path, false
+	}
+	if rest == "" {
+		rest = "/"
+	}
+	return rest, true
 }
 
 // logRequests logs every request at debug level.
@@ -126,8 +168,8 @@ func (s *Server) handleChoose(w http.ResponseWriter, r *http.Request) {
 		Title:     title,
 		Domain:    domain,
 		ID:        id,
-		ActionURL: "/" + id + "/archive" + q,
-		AltAction: "/" + id + "/delete" + q,
+		ActionURL: s.prefix + "/" + id + "/archive" + q,
+		AltAction: s.prefix + "/" + id + "/delete" + q,
 		HeadTitle: "Archive or delete?",
 		Heading:   "Archive or delete?",
 	})
@@ -144,8 +186,8 @@ func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
 		Domain:     domain,
 		ID:         id,
 		Action:     action,
-		ActionURL:  "/" + id + "/" + action,
-		CancelURL:  "/" + id + paramQuery(title, domain),
+		ActionURL:  s.prefix + "/" + id + "/" + action,
+		CancelURL:  s.prefix + "/" + id + paramQuery(title, domain),
 		HeadTitle:  "Confirm " + action,
 		Heading:    label + " this article?",
 		ButtonText: label,
@@ -183,7 +225,7 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.log.Info("article state changed", "action", action, "id", id, "title", title)
-	http.Redirect(w, r, s.baseURL+"/"+id+"/"+action+"/done"+paramQuery(title, domain), http.StatusSeeOther)
+	http.Redirect(w, r, s.prefix+"/"+id+"/"+action+"/done"+paramQuery(title, domain), http.StatusSeeOther)
 }
 
 func (s *Server) handleDone(w http.ResponseWriter, r *http.Request) {

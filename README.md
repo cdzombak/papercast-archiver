@@ -21,7 +21,7 @@ instapaper:
 ```
 
 - `server.listen`: address/port the server listens on.
-- `server.base_url`: the complete public base URL at which the app is exposed (i.e. what users' browsers see, through the reverse proxy).
+- `server.base_url`: the complete public base URL at which the app is exposed (i.e. what users' browsers see, through the reverse proxy). This may include a path prefix (e.g. `https://server.example.com/archiver`); all links the app generates are placed under that prefix. The app accepts requests both with and without the prefix, so it works whether or not the reverse proxy strips the prefix before proxying.
 - `instapaper.consumer_key`/`consumer_secret`: an Instapaper OAuth consumer token; [request one here](https://www.instapaper.com/main/request_oauth_consumer_token).
 - `instapaper.credentials_file`: path where the Instapaper OAuth token is stored, created by `instapaper-login`.
 
@@ -64,6 +64,8 @@ tailscale serve --bg --https=8443 http://127.0.0.1:8080
 ```
 
 Set `server.base_url` to the resulting URL (e.g. `https://server.my-tailnet.ts.net:8443`), and point papercast's archiver link configuration at the same URL.
+
+To serve the app under a path instead (e.g. `tailscale serve --bg --set-path=/archiver http://127.0.0.1:8080`, or an equivalent nginx `location` block), include that path in `server.base_url` (e.g. `https://server.my-tailnet.ts.net/archiver`).
 
 ## CLI
 
