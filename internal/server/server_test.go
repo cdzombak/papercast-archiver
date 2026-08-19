@@ -73,6 +73,13 @@ func TestNotFound(t *testing.T) {
 		"/abc",
 		"/12x34",
 		"/-5",
+		"/+5",
+		// Numeric but too large to be a bookmark ID: 404s on every route,
+		// so the choice and confirmation pages can't offer an action the
+		// POST would reject.
+		"/99999999999999999999999",
+		"/99999999999999999999999/archive",
+		"/99999999999999999999999/archive/done",
 		"/123/rename",
 		"/123/archive/done/extra",
 		"/_status/x",
@@ -323,6 +330,38 @@ func TestCutPathPrefix(t *testing.T) {
 		if got != tt.want || ok != tt.ok {
 			t.Errorf("cutPathPrefix(%q, %q) = %q, %v; want %q, %v",
 				tt.path, tt.prefix, got, ok, tt.want, tt.ok)
+		}
+	}
+}
+
+func TestParseBookmarkID(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    int64
+		wantErr bool
+	}{
+		{"1", 1, false},
+		{"12345", 12345, false},
+		{"042", 42, false},
+		{"9223372036854775807", 9223372036854775807, false},
+		{"9223372036854775808", 0, true},
+		{"", 0, true},
+		{"-5", 0, true},
+		{"+5", 0, true},
+		{"12x34", 0, true},
+	}
+	for _, tt := range tests {
+		got, err := parseBookmarkID(tt.in)
+		if tt.wantErr {
+			if err == nil {
+				t.Errorf("parseBookmarkID(%q): want error, got %d", tt.in, got)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("parseBookmarkID(%q): %v", tt.in, err)
+		} else if got != tt.want {
+			t.Errorf("parseBookmarkID(%q) = %d, want %d", tt.in, got, tt.want)
 		}
 	}
 }

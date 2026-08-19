@@ -137,86 +137,93 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{"ok": true}`))
 }
 
+// reqParams holds the validated inputs to a request handler.
+type reqParams struct {
+	ID         string // bookmark ID exactly as it appeared in the path
+	BookmarkID int64
+	Action     string // "archive" or "delete"; empty when not part of the route
+	Title      string
+	Domain     string
+}
+
 // requestParams extracts and validates the id and optional action path
 // segments, and the truncated title/domain params (from the query on GET,
 // the form body on POST). It reports ok=false after replying 404.
-func (s *Server) requestParams(w http.ResponseWriter, r *http.Request, needAction bool) (id, action, title, domain string, ok bool) {
-	id = r.PathValue("id")
-	if !isNumeric(id) {
+func (s *Server) requestParams(w http.ResponseWriter, r *http.Request, needAction bool) (reqParams, bool) {
+	p := reqParams{ID: r.PathValue("id")}
+	bookmarkID, err := parseBookmarkID(p.ID)
+	if err != nil {
 		http.NotFound(w, r)
-		return "", "", "", "", false
+		return reqParams{}, false
 	}
+	p.BookmarkID = bookmarkID
 	if needAction {
-		action = r.PathValue("action")
-		if action != "archive" && action != "delete" {
+		p.Action = r.PathValue("action")
+		if p.Action != "archive" && p.Action != "delete" {
 			http.NotFound(w, r)
-			return "", "", "", "", false
+			return reqParams{}, false
 		}
 	}
-	title = truncateRunes(r.FormValue("title"), maxParamRunes)
-	domain = truncateRunes(r.FormValue("domain"), maxParamRunes)
-	return id, action, title, domain, true
+	p.Title = truncateRunes(r.FormValue("title"), maxParamRunes)
+	p.Domain = truncateRunes(r.FormValue("domain"), maxParamRunes)
+	return p, true
 }
 
 func (s *Server) handleChoose(w http.ResponseWriter, r *http.Request) {
-	id, _, title, domain, ok := s.requestParams(w, r, false)
+	p, ok := s.requestParams(w, r, false)
 	if !ok {
 		return
 	}
-	q := paramQuery(title, domain)
+	q := paramQuery(p.Title, p.Domain)
 	s.render(w, http.StatusOK, "choose.html", pageData{
-		Title:     title,
-		Domain:    domain,
-		ID:        id,
-		ActionURL: s.prefix + "/" + id + "/archive" + q,
-		AltAction: s.prefix + "/" + id + "/delete" + q,
+		Title:     p.Title,
+		Domain:    p.Domain,
+		ID:        p.ID,
+		ActionURL: s.prefix + "/" + p.ID + "/archive" + q,
+		AltAction: s.prefix + "/" + p.ID + "/delete" + q,
 		HeadTitle: "Archive or delete?",
 		Heading:   "Archive or delete?",
 	})
 }
 
 func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
-	id, action, title, domain, ok := s.requestParams(w, r, true)
+	p, ok := s.requestParams(w, r, true)
 	if !ok {
 		return
 	}
-	label := actionLabel(action)
+	label := actionLabel(p.Action)
 	s.render(w, http.StatusOK, "confirm.html", pageData{
-		Title:      title,
-		Domain:     domain,
-		ID:         id,
-		Action:     action,
-		ActionURL:  s.prefix + "/" + id + "/" + action,
-		CancelURL:  s.prefix + "/" + id + paramQuery(title, domain),
-		HeadTitle:  "Confirm " + action,
+		Title:      p.Title,
+		Domain:     p.Domain,
+		ID:         p.ID,
+		Action:     p.Action,
+		ActionURL:  s.prefix + "/" + p.ID + "/" + p.Action,
+		CancelURL:  s.prefix + "/" + p.ID + paramQuery(p.Title, p.Domain),
+		HeadTitle:  "Confirm " + p.Action,
 		Heading:    label + " this article?",
 		ButtonText: label,
 	})
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
-	id, action, title, domain, ok := s.requestParams(w, r, true)
+	p, ok := s.requestParams(w, r, true)
 	if !ok {
 		return
 	}
-	bookmarkID, err := parseBookmarkID(id)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
 
-	if action == "archive" {
-		err = s.api.Archive(r.Context(), bookmarkID)
+	var err error
+	if p.Action == "archive" {
+		err = s.api.Archive(r.Context(), p.BookmarkID)
 	} else {
-		err = s.api.Delete(r.Context(), bookmarkID)
+		err = s.api.Delete(r.Context(), p.BookmarkID)
 	}
 	if err != nil {
-		s.log.Error("instapaper API call failed", "action", action, "id", id, "error", err)
+		s.log.Error("instapaper API call failed", "action", p.Action, "id", p.ID, "error", err)
 		s.render(w, http.StatusInternalServerError, "error.html", pageData{
-			Title:     title,
-			Domain:    domain,
-			ID:        id,
-			Action:    action,
+			Title:     p.Title,
+			Domain:    p.Domain,
+			ID:        p.ID,
+			Action:    p.Action,
 			ErrorText: err.Error(),
 			HeadTitle: "Error",
 			Heading:   "Something went wrong",
@@ -224,24 +231,24 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.log.Info("article state changed", "action", action, "id", id, "title", title)
-	http.Redirect(w, r, s.prefix+"/"+id+"/"+action+"/done"+paramQuery(title, domain), http.StatusSeeOther)
+	s.log.Info("article state changed", "action", p.Action, "id", p.ID, "title", p.Title)
+	http.Redirect(w, r, s.prefix+"/"+p.ID+"/"+p.Action+"/done"+paramQuery(p.Title, p.Domain), http.StatusSeeOther)
 }
 
 func (s *Server) handleDone(w http.ResponseWriter, r *http.Request) {
-	id, action, title, domain, ok := s.requestParams(w, r, true)
+	p, ok := s.requestParams(w, r, true)
 	if !ok {
 		return
 	}
 	heading := "Archived"
-	if action == "delete" {
+	if p.Action == "delete" {
 		heading = "Deleted"
 	}
 	s.render(w, http.StatusOK, "done.html", pageData{
-		Title:     title,
-		Domain:    domain,
-		ID:        id,
-		Action:    action,
+		Title:     p.Title,
+		Domain:    p.Domain,
+		ID:        p.ID,
+		Action:    p.Action,
 		HeadTitle: heading,
 		Heading:   heading,
 	})
@@ -278,21 +285,12 @@ func actionLabel(action string) string {
 	return "Archive"
 }
 
-func isNumeric(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-// parseBookmarkID parses a numeric path segment into an Instapaper bookmark ID.
+// parseBookmarkID parses a path segment into an Instapaper bookmark ID.
+// A sign, any non-digit, and a value too large for an int64 are all rejected,
+// so every route agrees on which IDs exist.
 func parseBookmarkID(s string) (int64, error) {
-	return strconv.ParseInt(s, 10, 64)
+	v, err := strconv.ParseUint(s, 10, 63)
+	return int64(v), err
 }
 
 // truncateRunes limits s to max runes, appending an ellipsis if truncated.
