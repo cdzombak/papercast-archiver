@@ -1,6 +1,7 @@
 {{define "content"}}
 <h1>{{.Heading}}</h1>
 {{template "article" .}}
+{{if eq .Action "delete"}}<p class="warning">This permanently removes the article from Instapaper and can't be undone.</p>{{end}}
 <div class="actions">
   <form method="post" action="{{.ActionURL}}">
     <input type="hidden" name="title" value="{{.Title}}">

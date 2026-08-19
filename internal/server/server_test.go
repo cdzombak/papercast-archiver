@@ -159,11 +159,19 @@ func TestConfirmPage(t *testing.T) {
 		`name="domain" value="d.com"`,
 		">Delete</button>",
 		"Delete this article?",
+		"can't be undone",
 		`class="cancel" href="/42?domain=d.com&amp;title=T"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("body missing %q", want)
 		}
+	}
+}
+
+func TestArchiveConfirmPageHasNoWarning(t *testing.T) {
+	rec := get(t, testServer(&mockAPI{}), "/42/archive")
+	if body := rec.Body.String(); strings.Contains(body, "can't be undone") {
+		t.Error("archive confirmation should not warn about permanence")
 	}
 }
 
