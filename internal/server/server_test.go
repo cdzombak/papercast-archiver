@@ -334,6 +334,56 @@ func TestCutPathPrefix(t *testing.T) {
 	}
 }
 
+func TestRejectsCrossSitePost(t *testing.T) {
+	api := &mockAPI{}
+	req := httptest.NewRequest(http.MethodPost, "/12345/delete", strings.NewReader(""))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	req.Header.Set("Origin", "https://evil.example")
+	rec := httptest.NewRecorder()
+	testServer(api).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("status = %d, want 403", rec.Code)
+	}
+	if len(api.deleted) != 0 {
+		t.Errorf("deleted = %v, want no API call", api.deleted)
+	}
+}
+
+func TestAllowsSameSitePost(t *testing.T) {
+	// "none" is a user-initiated navigation; an absent header is a client
+	// that doesn't send fetch metadata. Neither is blocked.
+	for _, site := range []string{"same-origin", "same-site", "none", ""} {
+		api := &mockAPI{}
+		req := httptest.NewRequest(http.MethodPost, "/12345/archive", strings.NewReader(""))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if site != "" {
+			req.Header.Set("Sec-Fetch-Site", site)
+		}
+		rec := httptest.NewRecorder()
+		testServer(api).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusSeeOther {
+			t.Errorf("Sec-Fetch-Site %q: status = %d, want 303", site, rec.Code)
+		}
+		if len(api.archived) != 1 {
+			t.Errorf("Sec-Fetch-Site %q: archived = %v", site, api.archived)
+		}
+	}
+}
+
+func TestAllowsCrossSiteGet(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/12345", nil)
+	req.Header.Set("Sec-Fetch-Site", "cross-site")
+	rec := httptest.NewRecorder()
+	testServer(&mockAPI{}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("status = %d, want 200", rec.Code)
+	}
+}
+
 func TestParseBookmarkID(t *testing.T) {
 	tests := []struct {
 		in      string

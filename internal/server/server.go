@@ -53,7 +53,26 @@ func (s *Server) Handler() http.Handler {
 	if s.prefix != "" {
 		h = stripPrefix(s.prefix, mux)
 	}
-	return s.logRequests(h)
+	return s.logRequests(s.rejectCrossSite(h))
+}
+
+// rejectCrossSite blocks state-changing requests that the browser reports as
+// coming from another site. Nothing here is authenticated, so otherwise a
+// page on any site the user visits could submit a form that archives or
+// deletes an article. Requests without the header — curl, older browsers —
+// are allowed through; this hardens the browser case rather than
+// authenticating the request.
+func (s *Server) rejectCrossSite(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead &&
+			r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+			s.log.Warn("rejected cross-site request", "method", r.Method, "path", r.URL.Path,
+				"origin", r.Header.Get("Origin"))
+			http.Error(w, "cross-site request rejected", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // stripPrefix serves requests whose path begins with prefix by removing it,
