@@ -86,6 +86,20 @@ papercast-archiver <command> [flags]
 
 All commands accept `-config <path>` and `-log-level <debug|info|warn|error>` (default `info`).
 
+## Building from source
+
+Requires Go; see [`go.mod`](go.mod) for the minimum version. The Makefile wraps the common tasks:
+
+```shell
+make build         # build ./out/papercast-archiver for the current platform
+make test          # run the test suite
+make lint          # golangci-lint, gofmt, and go vet
+make build-docker  # build a Docker image for the current machine
+make help          # list every target
+```
+
+The version reported by `papercast-archiver version` is derived from git by [`.version.sh`](.version.sh) and embedded at build time: the tag if `HEAD` carries one, otherwise a `git describe` string.
+
 ## License
 
 MIT; see [LICENSE](LICENSE).
