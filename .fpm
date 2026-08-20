@@ -1,0 +1,6 @@
+-s dir
+--name papercast-archiver
+--description "Web companion to papercast that archives or deletes the Instapaper article behind an episode"
+--url "https://github.com/cdzombak/papercast-archiver"
+--maintainer "Chris Dzombak <https://www.dzombak.com>"
+--license MIT

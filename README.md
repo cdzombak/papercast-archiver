@@ -5,6 +5,53 @@ A tiny web companion to [papercast](https://github.com/cdzombak/papercast). pape
 > [!WARNING]
 > There is no authentication; the app is designed to run behind Tailscale or a similar secure, single-user reverse proxy. Do not expose it to the public internet.
 
+## Installation
+
+### macOS via Homebrew
+
+```shell
+brew install cdzombak/oss/papercast-archiver
+```
+
+### Debian via Apt repository
+
+Install my Debian repository if you haven't already:
+
+```shell
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://dist.cdzombak.net/deb.key | sudo gpg --dearmor -o /etc/apt/keyrings/dist-cdzombak-net.gpg
+sudo chmod 0644 /etc/apt/keyrings/dist-cdzombak-net.gpg
+echo -e "deb [signed-by=/etc/apt/keyrings/dist-cdzombak-net.gpg] https://dist.cdzombak.net/deb/oss any oss\n" | sudo tee -a /etc/apt/sources.list.d/dist-cdzombak-net.list > /dev/null
+sudo apt update
+```
+
+Then install `papercast-archiver` via `apt`:
+
+```shell
+sudo apt install papercast-archiver
+```
+
+The package installs the binary only; running it as a service is up to you.
+
+### Manual installation from build artifacts
+
+Pre-built binaries for Linux and macOS (amd64 and arm64) are attached to every [GitHub Release](https://github.com/cdzombak/papercast-archiver/releases). Debian packages for each release are published as well.
+
+### Docker image
+
+Multi-architecture images are published to Docker Hub and GHCR; see [Deployment](#deployment) below.
+
+### Build and install locally
+
+```shell
+git clone https://github.com/cdzombak/papercast-archiver.git
+cd papercast-archiver
+make build
+
+cp out/papercast-archiver $INSTALL_DIR
+```
+
 ## Configuration
 
 Configuration is a YAML file, passed via `-config` (default `./config.yaml`). See [`config.example.yaml`](config.example.yaml):
@@ -92,6 +139,8 @@ Requires Go; see [`go.mod`](go.mod) for the minimum version. The Makefile wraps 
 
 ```shell
 make build         # build ./out/papercast-archiver for the current platform
+make all           # cross-compile for macOS and Linux (amd64, arm64)
+make package       # build all binaries + .deb packages (requires fpm)
 make test          # run the test suite
 make lint          # golangci-lint, gofmt, and go vet
 make build-docker  # build a Docker image for the current machine
